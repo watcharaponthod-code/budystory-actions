@@ -16,12 +16,16 @@ Automation ปักหมุด + คอมเมนต์ช่อง + **ป�
 - เลือกสินค้าให้คลิปอัตโนมัติจาก `REVIEW_PRODUCTS` ใน `cloudflare/picker.js` (กฎ highcom:
   ราคา×ค่าคอมสูงสุด + ชื่อต้องมีคำใน `must` + ราคา ≥ min) แก้รายการสินค้าที่เดียวกันนั้น
 
-### ติดตั้ง runner บนเครื่องนี้ (ครั้งเดียว)
+### ติดตั้ง runner บนเครื่องนี้ (ติดตั้งแล้วเมื่อ 16 พ.ย. 2026)
 
-1. repo > Settings > Actions > Runners > New self-hosted runner (Windows x64) — สคริปต์
-   download/config ตามหน้านั้น ตอน config ให้ใส่ label คงเดิม (`self-hosted,Windows`)
-2. เริ่ม runner ด้วย `run.cmd` (หรือตั้งเป็น service ตอน config ถ้ามีสิทธิ์ admin)
-3. ทดสอบ: Actions > tag-products > Run workflow ตั้ง `dry=true` > ดู log
+1. ติดตั้งไว้ที่ `C:\actions-runner` (runner v2.338.2, labels self-hosted/Windows/X64,
+   ชื่อ LAPTOP-78Q10VL3, work dir `C:\actions-runner\_work`)
+2. **สตาร์ตผ่าน `run-invariant.cmd` เท่านั้น** — wrapper ที่ตั้ง
+   `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` เพราะ runner มี bug #4686:
+   เครื่อง culture `th-TH` ทุก job ล้มก่อน step แรกใน SecretMasker
+3. เปิดอัตโนมัติตอนล็อกอินผ่าน HKCU Run key → `run-hidden.vbs` (หน้าต่างซ่อน)
+4. ทดสอบ: Actions > runner-smoke > Run workflow (ต้อง success) แล้ว
+   tag-products > Run workflow ตั้ง `dry=true` > ดู log
 
 ### ทำไมไม่ยิง Studio จาก GitHub-hosted runner (ubuntu-latest) ตรง ๆ
 
