@@ -1,6 +1,32 @@
 # budystory-actions
 
-Automation ปักหมุด + คอมเมนต์ช่อง BudyStory บน GitHub Actions
+Automation ปักหมุด + คอมเมนต์ช่อง + **ปักตะกร้าสินค้า (YouTube Shopping)** บน GitHub Actions
+
+## ปักตะกร้าสินค้า (tag-products) — รันบน self-hosted runner ของเครื่องนี้
+
+- **Data API ไม่มี endpoint ปักสินค้า** (ยืนยันจาก docs 16 พ.ย. 2026 — videos.update มีแค่ snippet/status เท่านั้น)
+  การติดแท็กจริงทำได้ทางเดียว = YouTube Studio UI โปรเจกต์จึงใช้ `scripts/tag_products.mjs`
+  ขับ Chrome จริงผ่าน Playwright MCP bridge — ซึ่งต้องรันในเครื่องที่ล็อกอิน BudyStory
+- ทางแก้ = **self-hosted runner** บนเครื่องเรา: นาทีรันฟรีไม่จำกัด (กติกาเดียวกับ public repo)
+  ใช้ IP/Chrome/ล็อกอินจริง ไม่มีความเสี่ยง Google บล็อกบัญชีจากการล็อกอินผ่าน IP ดาต้าเซ็นเตอร์
+- เงื่อนไขให้รอบรันสำเร็จ: เครื่องเปิด + runner ทำงานอยู่ + Chrome ล็อกอิน BudyStory และเปิด
+  extension bridge (token ใน `.env`) ไว้ · คลิปที่ยังตั้งเวลาไม่ public จะถูกข้ามแล้วรอบหน้าติดเอง
+- ตาราง: ทุกวัน **16:40 เวลาไทย** หลังคลิปขึ้นครบ + ยิงมือได้ที่ Actions > tag-products > Run
+  workflow (ใส่ days / limit / dry / retag ได้)
+- เลือกสินค้าให้คลิปอัตโนมัติจาก `REVIEW_PRODUCTS` ใน `cloudflare/picker.js` (กฎ highcom:
+  ราคา×ค่าคอมสูงสุด + ชื่อต้องมีคำใน `must` + ราคา ≥ min) แก้รายการสินค้าที่เดียวกันนั้น
+
+### ติดตั้ง runner บนเครื่องนี้ (ครั้งเดียว)
+
+1. repo > Settings > Actions > Runners > New self-hosted runner (Windows x64) — สคริปต์
+   download/config ตามหน้านั้น ตอน config ให้ใส่ label คงเดิม (`self-hosted,Windows`)
+2. เริ่ม runner ด้วย `run.cmd` (หรือตั้งเป็น service ตอน config ถ้ามีสิทธิ์ admin)
+3. ทดสอบ: Actions > tag-products > Run workflow ตั้ง `dry=true` > ดู log
+
+### ทำไมไม่ยิง Studio จาก GitHub-hosted runner (ubuntu-latest) ตรง ๆ
+
+ต้องฉีด cookies ล็อกอิน Studio ไปรันบน IP ดาต้าเซ็นเตอร์ = Google มองว่า session ผิดปกติ
+เสี่ยงบัญชีช่องถูกล็อก/ต้องยืนยันตัวตนกลางคัน (ช่วงนี้กำลังจะยื่น YPP) — ไม่คุ้ม ห้ามใช้
 
 ## ทำอะไรทุกวัน (15:30 เวลาไทย หลัง Worker budystory-upload ลงคลิปเสร็จ)
 

@@ -1,0 +1,50 @@
+name: tag-products
+
+# ปักตะกร้าสินค้า (YouTube Shopping) ใน Studio — Data API ไม่มี endpoint นี้
+# จึงรันบน self-hosted runner ของเครื่องนี้ (นาทีฟรีไม่จำกัด) เพื่อขับ Chrome จริง + bridge
+# เงื่อนไขรัน: เครื่องเปิด + Chrome ล็อกอิน BudyStory เปิด extension bridge ไว้
+# ความปลอดภัย: workflow นี้ยิงได้เฉพาะ schedule กับ workflow_dispatch (ต้องมีสิทธิ์ write ของ repo)
+# ดังนั้น PR ของคนแปลกหน้าใน public repo ไม่มีทางรันโค้ดบนเครื่องเรา
+
+on:
+  schedule:
+    - cron: '40 9 * * *'   # 16:40 Asia/Bangkok — หลังคลิปขึ้น public แล้วรอบวัน
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'ย้อนหลังกี่วัน'
+        required: false
+        default: '2'
+      limit:
+        description: 'ติดสูงสุดกี่คลิป'
+        required: false
+        default: '5'
+      dry:
+        description: 'dry-run (ค้นอย่างเดียว ไม่กดจริง)'
+        required: false
+        default: 'false'
+      retag:
+        description: 'ล้างของเดิมแล้วติดใหม่ (--retag)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-products
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+      - name: Tag products in YouTube Studio
+        working-directory: ${{ vars.PROJECT_DIR != '' && vars.PROJECT_DIR || 'C:\Users\watcharapon\Desktop\youtube automation' }}
+        run: >
+          node scripts/tag_products.mjs
+          --days ${{ github.event.inputs.days || '2' }}
+          --limit ${{ github.event.inputs.limit || '5' }}
+          ${{ github.event.inputs.dry == 'true' && '--dry' || '' }}
+          ${{ github.event.inputs.retag == 'true' && '--retag' || '' }}
