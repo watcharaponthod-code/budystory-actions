@@ -1,0 +1,15 @@
+name: runner-smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: self-hosted
+    timeout-minutes: 5
+    steps:
+      - name: echo
+        run: Write-Output "runner ok $(Get-Date -Format o)"
