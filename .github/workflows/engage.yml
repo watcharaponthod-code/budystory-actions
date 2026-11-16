@@ -1,0 +1,42 @@
+name: engage
+
+on:
+  schedule:
+    - cron: '30 8 * * *'   # 15:30 Asia/Bangkok — หลัง Worker budystory-upload ลงคลิปเสร็จ
+  workflow_dispatch:
+    inputs:
+      video_id:
+        description: 'เจาะจงคลิปเดียว (เว้นว่าง = ยิงคอมเมนต์ทุกคลิปใหม่ใน 26 ชม.)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engage
+  cancel-in-progress: false
+
+jobs:
+  engage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install requests
+
+      - name: Post channel comments on new clips + optional featured-video pin
+        run: python scripts/yt_engage.py
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          YT_CHANNEL_ID: ${{ vars.YT_CHANNEL_ID }}
+          TARGET_VIDEO_ID: ${{ github.event.inputs.video_id || '' }}
+          FEATURED_ENABLED: ${{ vars.FEATURED_ENABLED || 'false' }}
