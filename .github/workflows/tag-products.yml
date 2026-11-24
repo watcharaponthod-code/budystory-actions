@@ -1,32 +1,19 @@
 name: tag-products
 
 # ปักตะกร้าสินค้า (YouTube Shopping) ใน Studio — Data API ไม่มี endpoint นี้
-# จึงรันบน self-hosted runner ของเครื่องนี้ (นาทีฟรีไม่จำกัด) เพื่อขับ Chrome จริง + bridge
-# เงื่อนไขรัน: เครื่องเปิด + Chrome ล็อกอิน BudyStory เปิด extension bridge ไว้
-# ความปลอดภัย: workflow นี้ยิงได้เฉพาะ schedule กับ workflow_dispatch (ต้องมีสิทธิ์ write ของ repo)
-# ดังนั้น PR ของคนแปลกหน้าใน public repo ไม่มีทางรันโค้ดบนเครื่องเรา
+# 2026-11-24 ผู้ใช้สั่ง: ไม่รันบนเครื่องตัวเอง → รันบนเครื่องของ GitHub (ubuntu-latest) ด้วย cookie ล็อกอิน Google ใน secret
+# Cloudflare Worker budystory-upload บอกคลิปที่ต้องปัก (/tagtodo) และจดผล (/tagdone) · ไม่มีคลิปค้าง = ไม่เปิดเบราว์เซอร์
+# ความปลอดภัย: ยิงได้เฉพาะ schedule กับ workflow_dispatch · ห้ามอัป screenshot/trace เป็น artifact (repo public)
 
 on:
   schedule:
-    - cron: '40 9 * * *'   # 16:40 Asia/Bangkok — หลังคลิปขึ้น public แล้วรอบวัน
+    - cron: '5,20,35,50 3-7 * * *'   # ทุก 15 นาที 10:05-14:50 เวลาไทย (ช่วงที่ worker ลงคลิป)
+    - cron: '5 8 * * *'              # 15:05 เก็บตก
   workflow_dispatch:
     inputs:
-      days:
-        description: 'ย้อนหลังกี่วัน'
-        required: false
-        default: '2'
-      limit:
-        description: 'ติดสูงสุดกี่คลิป'
-        required: false
-        default: '5'
-      dry:
-        description: 'dry-run (ค้นอย่างเดียว ไม่กดจริง)'
-        required: false
-        default: 'false'
-      retag:
-        description: 'ล้างของเดิมแล้วติดใหม่ (--retag)'
-        required: false
-        default: 'false'
+      days: { description: 'ย้อนหลังกี่วัน', required: false, default: '3' }
+      limit: { description: 'ปักสูงสุดกี่คลิป', required: false, default: '5' }
+      dry: { description: 'dry-run (ค้นอย่างเดียว ไม่กดจริง)', required: false, default: 'false' }
 
 permissions:
   contents: read
@@ -37,14 +24,25 @@ concurrency:
 
 jobs:
   tag:
-    runs-on: self-hosted
-    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WORKER_URL: ${{ secrets.WORKER_URL }}
+      CF_RUN_KEY: ${{ secrets.CF_RUN_KEY }}
+      DAYS: ${{ github.event.inputs.days || '3' }}
+      LIMIT: ${{ github.event.inputs.limit || '5' }}
+      DRY: ${{ github.event.inputs.dry || 'false' }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Anything to tag?
+        id: todo
+        run: |
+          n=$(curl -sf -m 60 "$WORKER_URL/tagtodo?days=$DAYS&key=$CF_RUN_KEY" | jq length)
+          echo "n=$n" >> "$GITHUB_OUTPUT"; echo "clips to tag: $n"
       - name: Tag products in YouTube Studio
-        working-directory: ${{ vars.PROJECT_DIR != '' && vars.PROJECT_DIR || 'C:\Users\watcharapon\Desktop\youtube automation' }}
-        run: >
-          node scripts/tag_products.mjs
-          --days ${{ github.event.inputs.days || '2' }}
-          --limit ${{ github.event.inputs.limit || '5' }}
-          ${{ github.event.inputs.dry == 'true' && '--dry' || '' }}
-          ${{ github.event.inputs.retag == 'true' && '--retag' || '' }}
+        if: steps.todo.outputs.n != '0'
+        env:
+          YT_STORAGE_STATE: ${{ secrets.YT_STORAGE_STATE }}
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.49.1
+          node scripts/tag_cloud.mjs
