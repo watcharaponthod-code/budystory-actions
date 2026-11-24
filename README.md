@@ -2,35 +2,21 @@
 
 Automation ปักหมุด + คอมเมนต์ช่อง + **ปักตะกร้าสินค้า (YouTube Shopping)** บน GitHub Actions
 
-## ปักตะกร้าสินค้า (tag-products) — รันบน self-hosted runner ของเครื่องนี้
+## ปักตะกร้าสินค้า (tag-products) — รันบนเครื่องของ GitHub (ตั้งแต่ 24 พ.ย. 2026)
 
-- **Data API ไม่มี endpoint ปักสินค้า** (ยืนยันจาก docs 16 พ.ย. 2026 — videos.update มีแค่ snippet/status เท่านั้น)
-  การติดแท็กจริงทำได้ทางเดียว = YouTube Studio UI โปรเจกต์จึงใช้ `scripts/tag_products.mjs`
-  ขับ Chrome จริงผ่าน Playwright MCP bridge — ซึ่งต้องรันในเครื่องที่ล็อกอิน BudyStory
-- ทางแก้ = **self-hosted runner** บนเครื่องเรา: นาทีรันฟรีไม่จำกัด (กติกาเดียวกับ public repo)
-  ใช้ IP/Chrome/ล็อกอินจริง ไม่มีความเสี่ยง Google บล็อกบัญชีจากการล็อกอินผ่าน IP ดาต้าเซ็นเตอร์
-- เงื่อนไขให้รอบรันสำเร็จ: เครื่องเปิด + runner ทำงานอยู่ + Chrome ล็อกอิน BudyStory และเปิด
-  extension bridge (token ใน `.env`) ไว้ · คลิปที่ยังตั้งเวลาไม่ public จะถูกข้ามแล้วรอบหน้าติดเอง
-- ตาราง: ทุกวัน **16:40 เวลาไทย** หลังคลิปขึ้นครบ + ยิงมือได้ที่ Actions > tag-products > Run
-  workflow (ใส่ days / limit / dry / retag ได้)
-- เลือกสินค้าให้คลิปอัตโนมัติจาก `REVIEW_PRODUCTS` ใน `cloudflare/picker.js` (กฎ highcom:
-  ราคา×ค่าคอมสูงสุด + ชื่อต้องมีคำใน `must` + ราคา ≥ min) แก้รายการสินค้าที่เดียวกันนั้น
-
-### ติดตั้ง runner บนเครื่องนี้ (ติดตั้งแล้วเมื่อ 16 พ.ย. 2026)
-
-1. ติดตั้งไว้ที่ `C:\actions-runner` (runner v2.338.2, labels self-hosted/Windows/X64,
-   ชื่อ LAPTOP-78Q10VL3, work dir `C:\actions-runner\_work`)
-2. **สตาร์ตผ่าน `run-invariant.cmd` เท่านั้น** — wrapper ที่ตั้ง
-   `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` เพราะ runner มี bug #4686:
-   เครื่อง culture `th-TH` ทุก job ล้มก่อน step แรกใน SecretMasker
-3. เปิดอัตโนมัติตอนล็อกอินผ่าน HKCU Run key → `run-hidden.vbs` (หน้าต่างซ่อน)
-4. ทดสอบ: Actions > runner-smoke > Run workflow (ต้อง success) แล้ว
-   tag-products > Run workflow ตั้ง `dry=true` > ดู log
-
-### ทำไมไม่ยิง Studio จาก GitHub-hosted runner (ubuntu-latest) ตรง ๆ
-
-ต้องฉีด cookies ล็อกอิน Studio ไปรันบน IP ดาต้าเซ็นเตอร์ = Google มองว่า session ผิดปกติ
-เสี่ยงบัญชีช่องถูกล็อก/ต้องยืนยันตัวตนกลางคัน (ช่วงนี้กำลังจะยื่น YPP) — ไม่คุ้ม ห้ามใช้
+- ผู้ใช้สั่ง 24 พ.ย. 2026: ไม่รันบนเครื่องตัวเอง Scheduled Task `BudyStory-TagProducts` ถูกลบ และ self-hosted runner
+  `C:ctions-runner` ถูกปิด (โฟลเดอร์ยังอยู่ ไม่เปิดเองตอนล็อกอินแล้ว)
+- **Data API ไม่มี endpoint ปักสินค้า** ต้องทำผ่านหน้า YouTube Studio: `scripts/tag_cloud.mjs` เปิด Chrome บน `ubuntu-latest`
+  ล็อกอินด้วย cookie Google ของช่องใน secret `YT_STORAGE_STATE` (gzip + base64 ของ Playwright storageState + user agent)
+- Cloudflare Worker `budystory-upload` บอกคลิปรีวิวที่ยังไม่ปักพร้อมคำค้น (`/tagtodo`) และจดผลใน KV `tag:<id>` (`/tagdone`)
+  ไม่มีคลิปค้าง = ไม่เปิดเบราว์เซอร์ · คลิปที่หาสินค้าไม่เจอ 3 รอบจะเลิกลอง
+- ตาราง: ทุก 15 นาที 10:05-14:50 และ 15:05 เวลาไทย + ยิงมือได้ (days / limit / dry)
+- Secrets: `YT_STORAGE_STATE`, `CF_RUN_KEY`, `WORKER_URL`
+- **ถ้า run ล้มด้วย "เข้า Studio ของ BudyStory ไม่ได้"** = cookie หมดอายุหรือ Google ขอยืนยันตัวตน: ส่งออก cookie ใหม่จาก Chrome
+  ที่ล็อกอินช่อง (เฉพาะโดเมน google.com / youtube.com) แล้วตั้ง secret ใหม่
+- ความเสี่ยงที่รับไว้: Google เห็นการเข้าใช้จาก IP ดาต้าเซ็นเตอร์ อาจตัด session หรือขอยืนยันตัวตน
+- ห้ามอัป screenshot / trace เป็น artifact: repo นี้ public
+- `choose` + `tagOne` ใน `tag_cloud.mjs` คัดลอกจาก `scripts/tag_products.mjs` ของโปรเจกต์ แก้กฎเลือกสินค้าต้องแก้ทั้งสองที่
 
 ## ทำอะไรทุกวัน (15:30 เวลาไทย หลัง Worker budystory-upload ลงคลิปเสร็จ)
 
