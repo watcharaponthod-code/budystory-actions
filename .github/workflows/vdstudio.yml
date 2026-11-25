@@ -1,0 +1,72 @@
+name: vdstudio-daily
+
+# คลิปยาวอวกาศช่อง VDstudio วันละ 5 คลิป บนเครื่องของ GitHub (ผู้ใช้สั่ง 11-25: ห้ามรันบนเครื่องผู้ใช้ — แทน repo vdstudio-daily ที่ใช้ self-hosted runner)
+# Wikipedia → Gemini Notebook (NotebookLM) เจนเสียงพิธีกร ด้วย cookie Google ใน secret NB_STATE → ภาพ NASA + เพลง → อัป VDstudio ผ่าน Maton
+# cron GitHub มาช้า/หายบ่อย → ตั้งหลายรอบ รอบแรกที่ได้รันทำงาน รอบหลังเห็น last_run.txt = วันนี้ แล้วออก
+# เพลง Pixabay ห้ามแจกต่อใน repo public → ดึงจาก Worker (KV asset:bg.mp3) ตอนรัน
+
+on:
+  schedule:
+    - cron: '0 1 * * *'    # 08:00 ไทย
+    - cron: '0 3 * * *'    # 10:00 ไทย สำรอง
+    - cron: '0 6 * * *'    # 13:00 ไทย สำรอง
+    - cron: '0 10 * * *'   # 17:00 ไทย สำรอง
+  workflow_dispatch:
+    inputs:
+      force: { description: 'รันแม้วันนี้รันไปแล้ว', required: false, default: 'false' }
+
+permissions:
+  contents: write   # จด used.json + last_run.txt กลับเข้า repo
+
+concurrency:
+  group: vdstudio
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - name: วันนี้รันไปแล้วหรือยัง
+        id: gate
+        run: |
+          today=$(TZ=Asia/Bangkok date +%F)
+          if [ "$(cat longform/last_run.txt 2>/dev/null)" = "$today" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then echo "รันไปแล้ววันนี้"; echo "go=0" >> $GITHUB_OUTPUT; else echo "go=1" >> $GITHUB_OUTPUT; fi
+          echo "today=$today" >> $GITHUB_OUTPUT
+      - if: steps.gate.outputs.go == '1'
+        name: จองวันนี้ (กันรอบสำรองรันซ้อน)
+        run: |
+          echo "${{ steps.gate.outputs.today }}" > longform/last_run.txt
+          git config user.name vdstudio-bot; git config user.email vdstudio-bot@users.noreply.github.com
+          git add longform/last_run.txt; git commit -qm "vdstudio: start ${{ steps.gate.outputs.today }}"; git push -q
+      - if: steps.gate.outputs.go == '1'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - if: steps.gate.outputs.go == '1'
+        name: ติดตั้ง ffmpeg + playwright + เพลง
+        env: { WORKER_URL: '${{ secrets.WORKER_URL }}', CF_RUN_KEY: '${{ secrets.CF_RUN_KEY }}' }
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          pip install -q playwright==1.49.1 edge-tts
+          python -m playwright install --with-deps chromium >/dev/null
+          mkdir -p longform/music && curl -fsS "$WORKER_URL/asset?k=bg.mp3&key=$CF_RUN_KEY" -o longform/music/bg.mp3
+      - if: steps.gate.outputs.go == '1'
+        name: ทำ+ลงจนครบ 5 หรือโควตาหมด
+        env:
+          PYTHONIOENCODING: utf-8
+          NB_STATE: ${{ secrets.NB_STATE }}
+          MATON_API_KEY: ${{ secrets.MATON_API_KEY }}
+          MATON_VD_CONNECTION: ${{ secrets.MATON_VD_CONNECTION }}
+        run: python -u longform/daily.py --all
+      - if: always() && steps.gate.outputs.go == '1'
+        name: จดหัวข้อที่ใช้แล้ว
+        run: |
+          git add longform/used.json
+          git diff --cached --quiet || { git commit -qm "vdstudio: used topics ${{ steps.gate.outputs.today }}"; git pull -q --rebase; git push -q; }
+      - if: failure() && steps.gate.outputs.go == '1'
+        name: ลงไม่ได้สักคลิป → ปลดจอง ให้รอบสำรองถัดไปลองใหม่
+        run: |
+          : > longform/last_run.txt
+          git add longform/last_run.txt
+          git diff --cached --quiet || { git commit -qm "vdstudio: release ${{ steps.gate.outputs.today }} after failure"; git pull -q --rebase; git push -q; }
