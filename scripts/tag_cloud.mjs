@@ -46,10 +46,14 @@ const tagOne = (id, queries, dry, retag) => `async (page) => {
   if (${dry}) return { status: 'dry', products };
   const header = await page.evaluate(() => document.querySelector('ytcp-dialog#main-dialog .ytshoppingProductPickerHeaderTitle')?.innerText || '');
   await page.evaluate(() => [...document.querySelectorAll('ytcp-dialog#main-dialog .footer button')].find(b => b.innerText.trim() === 'เสร็จ').click());
-  await sleep(2500);
-  // บางเวอร์ชัน "เสร็จ" บันทึกเลย บางเวอร์ชันต้องกด "บันทึก" ของหน้า
-  await page.evaluate(() => { const b = document.querySelector('ytcp-button#save button, #save button'); if (b && !b.disabled && b.getAttribute('aria-disabled') !== 'true') b.click(); });
-  await sleep(5000);
+  // 11-25: บน cloud กด "บันทึก" ตอนปุ่มยัง disabled → ข้าม → โหลดใหม่ของหาย · รอปุ่มพร้อม (≤20 วิ) กด แล้วรอ toast "บันทึกการเปลี่ยนแปลงแล้ว"
+  let clicked = false;
+  for (let t = 0; t < 20 && !clicked; t++) {
+    await sleep(1000);
+    clicked = await page.evaluate(() => { const b = document.querySelector('ytcp-button#save button, #save button'); if (!b || b.disabled || b.getAttribute('aria-disabled') === 'true') return false; b.click(); return true; });
+  }
+  for (let t = 0; t < 15; t++) { await sleep(1000); if (await page.evaluate(() => /บันทึกการเปลี่ยนแปลงแล้ว|Changes saved/.test([...document.querySelectorAll('tp-yt-paper-toast, ytcp-toast')].map(e => e.innerText).join(' ')))) break; }
+  await sleep(2000);
   // พิสูจน์: โหลดหน้าใหม่แล้วต้องยังเห็นสินค้า
   await page.goto('https://studio.youtube.com/video/${id}/edit', { timeout: 45000, waitUntil: 'commit' }).catch(() => {});
   await page.waitForSelector('#shopping-toolbar-edit', { state: 'attached', timeout: 30000 }).catch(() => {});
