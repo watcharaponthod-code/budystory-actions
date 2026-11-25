@@ -13,6 +13,7 @@ function choose(results, must, min, max = Infinity) {
     .filter(r => must.every(m => r.title.toLowerCase().includes(m)) && r.price >= min && r.price <= max).sort((a, b) => b.price * b.pct - a.price * a.pct)[0];
 }
 
+// 11-25 คำค้นของฮิตรายสัปดาห์เป็นชื่อร้านยาวโดนตัด ('กระเป๋าโท้ตเก็บอาหาร 6 12Lกระเป๋าใส่อาหา') Studio ค้นไม่เจอ → ข้อสองค้นด้วยชื่อสั้น cat ช่วงราคากว้างขึ้น
 // รันใน Chrome: คืน {status, products}. คลิกด้วย JS เพราะ Studio รายงาน element เป็น hidden กับ Playwright
 const tagOne = (id, queries, dry, retag) => `async (page) => {
   const sleep = ms => page.waitForTimeout(ms);
@@ -76,7 +77,7 @@ try {
   }
   if (acct < 0) throw new Error('เข้า Studio ของ BudyStory ไม่ได้ (หน้า ' + new URL(page.url()).hostname + ') — cookie หมดอายุหรือ Google ขอยืนยันตัวตน ต้องส่ง cookie ใหม่');
   for (const c of todo) {
-    let r; try { r = await run(tagOne(c.id, [{ q: c.q, must: c.must, min: c.min, max: c.max ?? undefined }], dry, false)); } catch (e) { r = { status: 'error', msg: String(e.message).slice(0, 300) }; }
+    let r; try { r = await run(tagOne(c.id, [{ q: c.q, must: c.must, min: c.min, max: c.max ?? undefined }, { q: c.cat, must: [c.cat.toLowerCase()], min: Math.floor(c.min / 2), max: c.max ? c.max * 2 : undefined }], dry, false)); } catch (e) { r = { status: 'error', msg: String(e.message).slice(0, 300) }; }
     console.log(c.id, c.cat, JSON.stringify(r));
     if (!dry) await api(`/tagdone?id=${c.id}&status=${r.status}`);
     if (!['tagged', 'already', 'dry', 'no-toolbar'].includes(r.status)) fail++;
