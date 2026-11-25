@@ -50,7 +50,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
           pip install -q playwright==1.49.1 edge-tts
           python -m playwright install --with-deps chromium >/dev/null
-          mkdir -p longform/music && curl -fsS "$WORKER_URL/asset?k=bg.mp3&key=$CF_RUN_KEY" -o longform/music/bg.mp3
+          mkdir -p longform/music && curl -fsS --retry 6 --retry-all-errors --retry-delay 20 "$WORKER_URL/asset?k=bg.mp3&key=$CF_RUN_KEY" -o longform/music/bg.mp3
       - if: steps.gate.outputs.go == '1'
         name: ทำ+ลงจนครบ 5 หรือโควตาหมด
         env:
