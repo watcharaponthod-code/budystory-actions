@@ -26,7 +26,7 @@ const tagOne = (id, queries, dry, retag) => `async (page) => {
   await page.waitForSelector('ytcp-dialog#main-dialog #search-input', { state: 'attached', timeout: 20000 });
   await sleep(1500);
   if (${retag} && !${dry}) { await page.evaluate(() => document.querySelector('ytcp-dialog#main-dialog .ytshoppingProductPickerSelectedProductClearAll button')?.click()); await sleep(1500); }   // --retag: ล้างของเดิมก่อน
-  const products = [];
+  const products = []; let seen = [];
   for (const P of ${JSON.stringify(queries)}) {
     const q = P.q;
     if (products.length >= ${PER_CLIP}) break;
@@ -36,13 +36,14 @@ const tagOne = (id, queries, dry, retag) => `async (page) => {
     for (let t = 0; t < 20; t++) {   // ≤30 วิ (cloud ช้า 15 วิไม่พอ 11-25) รอจนผลค้นเปลี่ยนจากคำค้นก่อนหน้าและนิ่ง
       await sleep(1500);
       const r = await page.evaluate(() => document.querySelector('ytcp-dialog#main-dialog tp-yt-paper-progress')?.hasAttribute('active') ? [] : [...document.querySelectorAll('ytcp-dialog#main-dialog ytshopping-product-picker-search-result')].map(e => ({ title: e.querySelector('.ytcpYtshoppingProductProductTitle')?.innerText.trim() || '', text: e.innerText })));
+      if (r.length) seen = r.slice(0, 4).map(x => x.text.replace(/\s+/g, ' ').slice(0, 110));
       if ((p = choose(r, P.must, P.min, P.max ?? Infinity))) break;   // รอจนผลค้นมีรุ่นที่ค้นจริง (ผลค้างจากคำค้นก่อน/รายการแนะนำเริ่มต้นไม่ผ่าน)
     }
     if (!p || products.some(x => x.startsWith(p.title.slice(0, 50)))) continue;
     products.push(p.title.slice(0, 50) + ' ฿' + p.price + ' ' + p.pct + '%');
     if (!${dry}) { await page.evaluate(i => document.querySelectorAll('ytcp-dialog#main-dialog ytshopping-product-picker-search-result')[i].querySelector('.tag-product-button').click(), p.i); await sleep(1200); }
   }
-  if (!products.length) return { status: 'no-results' };
+  if (!products.length) return { status: 'no-results', seen };   // seen = ผลค้นที่ cloud เห็นจริง ไว้ไล่ว่าทำไมไม่ผ่าน
   if (${dry}) return { status: 'dry', products };
   const header = await page.evaluate(() => document.querySelector('ytcp-dialog#main-dialog .ytshoppingProductPickerHeaderTitle')?.innerText || '');
   await page.evaluate(() => [...document.querySelectorAll('ytcp-dialog#main-dialog .footer button')].find(b => b.innerText.trim() === 'เสร็จ').click());
