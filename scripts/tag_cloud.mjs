@@ -33,7 +33,7 @@ const tagOne = (id, queries, dry, retag) => `async (page) => {
     await page.evaluate(q => { const i = document.querySelector('ytcp-dialog#main-dialog #search-input'); i.focus(); i.value = q; i.dispatchEvent(new Event('input', { bubbles: true })); }, q);
     await page.keyboard.press('Enter').catch(() => {});
     const choose = ${choose.toString()}; let p;
-    for (let t = 0; t < 10; t++) {   // รอจนผลค้นเปลี่ยนจากคำค้นก่อนหน้าและนิ่ง
+    for (let t = 0; t < 20; t++) {   // ≤30 วิ (cloud ช้า 15 วิไม่พอ 11-25) รอจนผลค้นเปลี่ยนจากคำค้นก่อนหน้าและนิ่ง
       await sleep(1500);
       const r = await page.evaluate(() => document.querySelector('ytcp-dialog#main-dialog tp-yt-paper-progress')?.hasAttribute('active') ? [] : [...document.querySelectorAll('ytcp-dialog#main-dialog ytshopping-product-picker-search-result')].map(e => ({ title: e.querySelector('.ytcpYtshoppingProductProductTitle')?.innerText.trim() || '', text: e.innerText })));
       if ((p = choose(r, P.must, P.min, P.max ?? Infinity))) break;   // รอจนผลค้นมีรุ่นที่ค้นจริง (ผลค้างจากคำค้นก่อน/รายการแนะนำเริ่มต้นไม่ผ่าน)
